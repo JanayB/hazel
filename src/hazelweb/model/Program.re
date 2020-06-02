@@ -1,5 +1,8 @@
+open Sexplib.Std;
+
 module Memo = Core_kernel.Memo;
 
+[@deriving sexp]
 type t = {
   edit_state: Statics.edit_state,
   width: int,
@@ -39,8 +42,8 @@ let get_zexp = program => {
   ze;
 };
 
-let _erase = Memo.general(~cache_size_bound=1000, ZExp.erase);
-let get_uhexp = program => program |> get_zexp |> _erase;
+let erase = Memo.general(~cache_size_bound=1000, ZExp.erase);
+let get_uhexp = program => program |> get_zexp |> erase;
 
 let get_path = program => program |> get_zexp |> CursorPath.Exp.of_z;
 let get_steps = program => {
@@ -54,7 +57,7 @@ let get_u_gen = program => {
 };
 
 exception MissingCursorInfo;
-let _cursor_info =
+let cursor_info =
   Memo.general(
     ~cache_size_bound=1000,
     CursorInfo.Exp.syn_cursor_info(Contexts.empty),
@@ -62,27 +65,27 @@ let _cursor_info =
 let get_cursor_info = (program: t) => {
   program
   |> get_zexp
-  |> _cursor_info
+  |> cursor_info
   |> OptUtil.get(() => raise(MissingCursorInfo));
 };
 
 exception DoesNotExpand;
-let _expand =
+let expand =
   Memo.general(
     ~cache_size_bound=1000,
     Dynamics.Exp.syn_expand(Contexts.empty, Delta.empty),
   );
 let get_expansion = (program: t): DHExp.t =>
-  switch (program |> get_uhexp |> _expand) {
+  switch (program |> get_uhexp |> expand) {
   | DoesNotExpand => raise(DoesNotExpand)
   | Expands(d, _, _) => d
   };
 
 exception InvalidInput;
-let _evaluate =
+let evaluate =
   Memo.general(~cache_size_bound=1000, Dynamics.Evaluator.evaluate);
 let get_result = (program: t): Result.t =>
-  switch (program |> get_expansion |> _evaluate) {
+  switch (program |> get_expansion |> evaluate) {
   | InvalidInput(_) => raise(InvalidInput)
   | BoxedValue(d) =>
     let (d_renumbered, hii) =
@@ -120,8 +123,23 @@ let move_to_hole = (u, program) => {
   switch (CursorPath.steps_to_hole(holes, u)) {
   | None => raise(HoleNotFound)
   | Some(hole_steps) =>
-    program |> perform_edit_action(MoveToBefore(hole_steps))
+    let e = ZExp.erase(ze);
+    switch (CursorPath.Exp.of_steps(hole_steps, e)) {
+    | None => raise(HoleNotFound)
+    | Some(hole_path) => program |> perform_edit_action(MoveTo(hole_path))
+    };
   };
+};
+
+let move_to_case_branch =
+    (steps_to_case, branch_index, program): (t, Action.t) => {
+  let steps_to_branch = steps_to_case @ [1 + branch_index];
+  let new_program =
+    perform_edit_action(
+      MoveTo((steps_to_branch, OnDelim(1, After))),
+      program,
+    );
+  (new_program, MoveTo((steps_to_branch, OnDelim(1, After))));
 };
 
 let get_doc = (~measure_program_get_doc: bool, ~memoize_doc: bool, program) => {
@@ -245,7 +263,8 @@ let move_via_click =
       ~memoize_doc: bool,
       row_col,
       program,
-    ) => {
+    )
+    : (t, Action.t) => {
   let (_, rev_path) =
     program
     |> get_cursor_map(
@@ -255,7 +274,9 @@ let move_via_click =
        )
     |> CursorMap.find_nearest_within_row(row_col);
   let path = CursorPath.rev(rev_path);
-  program |> focus |> clear_start_col |> perform_edit_action(MoveTo(path));
+  let new_program =
+    program |> focus |> clear_start_col |> perform_edit_action(MoveTo(path));
+  (new_program, MoveTo(path));
 };
 
 let move_via_key =
@@ -265,7 +286,8 @@ let move_via_key =
       ~memoize_doc: bool,
       move_key: JSUtil.MoveKey.t,
       program,
-    ) => {
+    )
+    : (t, Action.t) => {
   let (cmap, ((row, col), _) as z) =
     program
     |> get_cursor_map_z(
@@ -293,14 +315,17 @@ let move_via_key =
     | Home => (Some(cmap |> CursorMap.move_sol(row)), clear_start_col)
     | End => (Some(cmap |> CursorMap.move_eol(row)), clear_start_col)
     };
+
   switch (new_z) {
   | None => raise(CursorEscaped)
   | Some((_, rev_path)) =>
     let path = CursorPath.rev(rev_path);
-    program |> update_start_col |> perform_edit_action(MoveTo(path));
+    let new_program =
+      program |> update_start_col |> perform_edit_action(MoveTo(path));
+    (new_program, MoveTo(path));
   };
 };
 
-let _cursor_on_exp_hole =
+let cursor_on_exp_hole_ =
   Memo.general(~cache_size_bound=1000, ZExp.cursor_on_EmptyHole);
-let cursor_on_exp_hole = program => program |> get_zexp |> _cursor_on_exp_hole;
+let cursor_on_exp_hole = program => program |> get_zexp |> cursor_on_exp_hole_;
