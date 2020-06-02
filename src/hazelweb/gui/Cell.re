@@ -47,6 +47,7 @@ let kc_actions: Hashtbl.t(KeyCombo.t, CursorInfo.t => Action.t) =
     (Ctrl_Alt_Down, _ => Action.SwapDown),
     (Ctrl_Alt_Left, _ => Action.SwapLeft),
     (Ctrl_Alt_Right, _ => Action.SwapRight),
+    (Ctrl_Pound, _ => Action.ReNumberHoles),
   ]
   |> List.to_seq
   |> Hashtbl.of_seq;

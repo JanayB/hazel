@@ -435,6 +435,7 @@ module KeyCombo = {
     let ctrl_alt_down = ctrl_alt(Key.the_key("ArrowDown"));
     let ctrl_alt_left = ctrl_alt(Key.the_key("ArrowLeft"));
     let ctrl_alt_right = ctrl_alt(Key.the_key("ArrowRight"));
+    let ctrl_pound = ctrl(Key.the_key("#"));
   };
 
   [@deriving sexp]
@@ -469,7 +470,8 @@ module KeyCombo = {
     | Ctrl_Alt_Up
     | Ctrl_Alt_Down
     | Ctrl_Alt_Left
-    | Ctrl_Alt_Right;
+    | Ctrl_Alt_Right
+    | Ctrl_Pound;
 
   let get_details =
     fun
@@ -503,7 +505,8 @@ module KeyCombo = {
     | Ctrl_Alt_Up => Details.ctrl_alt_up
     | Ctrl_Alt_Down => Details.ctrl_alt_down
     | Ctrl_Alt_Left => Details.ctrl_alt_left
-    | Ctrl_Alt_Right => Details.ctrl_alt_right;
+    | Ctrl_Alt_Right => Details.ctrl_alt_right
+    | Ctrl_Pound => Details.ctrl_pound;
 
   let of_evt = (evt: Js.t(Dom_html.keyboardEvent)): option(t) => {
     let evt_matches = details => Details.matches(details, evt);
@@ -569,6 +572,8 @@ module KeyCombo = {
       Some(Ctrl_Alt_Left);
     } else if (evt_matches(Details.ctrl_alt_right)) {
       Some(Ctrl_Alt_Right);
+    } else if (evt_matches(Details.ctrl_pound)) {
+      Some(Ctrl_Pound);
     } else {
       None;
     };

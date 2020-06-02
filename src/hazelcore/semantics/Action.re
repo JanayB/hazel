@@ -47,7 +47,8 @@ type t =
   | SwapLeft
   | SwapRight
   | SwapUp
-  | SwapDown;
+  | SwapDown
+  | ReNumberHoles;
 
 module Outcome = {
   type t('success) =
@@ -162,7 +163,8 @@ module Typ = {
     | SwapLeft
     | SwapRight
     | SwapUp
-    | SwapDown =>
+    | SwapDown
+    | ReNumberHoles =>
       failwith(
         __LOC__
         ++ ": expected movement action, got "
@@ -4920,6 +4922,7 @@ module Exp = {
     | (UpdateApPalette(_) | Construct(SApPalette(_) | SListNil), _)
     | (_, ApPaletteZ(_)) =>
       ana_perform_subsume(ctx, a, (zoperand, u_gen), ty)
+    | ReNumberHoles => ana_fix_holes(ctx, u_gen, true, a, ty)
     }
   and ana_perform_subsume =
       (
