@@ -503,7 +503,7 @@ module KeyCombo = {
     | Ctrl_Alt_J
     | Ctrl_Alt_L
     | Meta_Z
-    | Meta_Shift_Z;
+    | Meta_Shift_Z
     | Ctrl_Pound;
 
   let get_details =
@@ -545,7 +545,7 @@ module KeyCombo = {
     | Ctrl_Alt_J => Details.ctrl_alt_j
     | Ctrl_Alt_L => Details.ctrl_alt_l
     | Meta_Z => Details.meta_z
-    | Meta_Shift_Z => Details.meta_shift_z;
+    | Meta_Shift_Z => Details.meta_shift_z
     | Ctrl_Pound => Details.ctrl_pound;
 
   let of_evt = (evt: Js.t(Dom_html.keyboardEvent)): option(t) => {

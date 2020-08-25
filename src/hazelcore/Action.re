@@ -47,8 +47,9 @@ type t =
   | SwapRight
   | SwapUp
   | SwapDown
-  | ReNumberHoles;
-  | Init;
+  | Init
+  | RenumberHoles;
+
 let shape_to_string = (shape: shape): string => {
   switch (shape) {
   | SList => "list type"
@@ -195,7 +196,7 @@ module Typ = {
     | SwapRight
     | SwapUp
     | SwapDown
-    | ReNumberHoles
+    | RenumberHoles
     | Init =>
       failwith(
         __LOC__
@@ -1923,6 +1924,17 @@ module Pat = {
         }
       }
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (zoperand, ctx, u_gen) =
+        Statics.Pat.ana_fix_holes_zoperand(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zoperand,
+          ty,
+        );
+      let zp = ZOpSeq.wrap(zoperand);
+      Succeeded((zp, ctx, u_gen));
     };
 };
 
@@ -2466,6 +2478,12 @@ module Exp = {
         ++ ": expected movement action, got "
         ++ Sexplib.Sexp.to_string(sexp_of_t(a)),
       )
+    | RenumberHoles =>
+      failwith(
+        __LOC__
+        ++ ": expected movement action, got "
+        ++ Sexplib.Sexp.to_string(sexp_of_t(a)),
+      )
     };
 
   let rec ana_move =
@@ -2522,6 +2540,12 @@ module Exp = {
     | SwapUp
     | SwapDown
     | Init =>
+      failwith(
+        __LOC__
+        ++ ": expected movement action, got "
+        ++ Sexplib.Sexp.to_string(sexp_of_t(a)),
+      )
+    | RenumberHoles =>
       failwith(
         __LOC__
         ++ ": expected movement action, got "
@@ -2961,6 +2985,15 @@ module Exp = {
         }
       };
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (new_zline, new_ctx, u_gen) =
+        Statics.Exp.syn_fix_holes_zline(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zline,
+        );
+      Succeeded(LineDone((([], new_zline, []), new_ctx, u_gen)));
     };
   }
   and syn_perform_opseq =
@@ -3276,6 +3309,16 @@ module Exp = {
         }
       };
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (zopseq, ty, u_gen) =
+        Statics.Exp.syn_fix_holes_zopseq(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zopseq,
+        );
+      let new_zopseq = ZExp.ZBlock.wrap'(zopseq);
+      Succeeded(SynDone((new_zopseq, ty, u_gen)));
     }
   and syn_perform_operand =
       (
@@ -3795,6 +3838,16 @@ module Exp = {
         }
       }
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (zoperand, ty, u_gen) =
+        Statics.Exp.syn_fix_holes_zoperand(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zoperand,
+        );
+      let new_zoperand = ZExp.ZBlock.wrap(zoperand);
+      Succeeded(SynDone((new_zoperand, ty, u_gen)));
     };
   }
   and syn_perform_rules =
@@ -3942,6 +3995,10 @@ module Exp = {
         }
       }
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (new_zrules, _, _, u_gen) =
+        Statics.Exp.syn_fix_holes_zrules(ctx, u_gen, zrules, pat_ty);
+      Succeeded((new_zrules, u_gen));
     };
   }
   and ana_perform_rules =
@@ -4096,6 +4153,17 @@ module Exp = {
         }
       }
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (new_zrules, u_gen) =
+        Statics.Exp.ana_fix_holes_zrules(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zrules,
+          pat_ty,
+          clause_ty,
+        );
+      Succeeded((new_zrules, u_gen));
     };
   }
   and ana_perform =
@@ -4625,6 +4693,19 @@ module Exp = {
         }
       };
     | (Init, _) => failwith("Init action should not be performed.")
+    | (RenumberHoles, _) =>
+      let (new_zopseq, u_gen) =
+        Statics.Exp.ana_fix_holes_zopseq(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zopseq,
+          ty,
+        );
+      let new_ze =
+        ZExp.ParenthesizedZ(ZExp.ZBlock.wrap'(new_zopseq))
+        |> ZExp.ZBlock.wrap;
+      Succeeded(AnaDone((new_ze, u_gen)));
     }
   and ana_perform_operand =
       (
@@ -5130,7 +5211,16 @@ module Exp = {
       ana_perform_subsume(ctx, a, (zoperand, u_gen), ty)
     /* Invalid actions at the expression level */
     | (Init, _) => failwith("Init action should not be performed.")
-    | ReNumberHoles => ana_fix_holes(ctx, u_gen, true, a, ty)
+    | (RenumberHoles, _) =>
+      let (new_zoperand, u_gen) =
+        Statics.Exp.ana_fix_holes_zoperand(
+          ctx,
+          u_gen,
+          ~renumber_empty_holes=true,
+          zoperand,
+          ty,
+        );
+      Succeeded(AnaDone((ZExp.ZBlock.wrap(new_zoperand), u_gen)));
     }
   and ana_perform_subsume =
       (
